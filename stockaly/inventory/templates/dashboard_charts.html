@@ -1,0 +1,862 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Stockaly - Analytics Dashboard{% endblock %}
+
+{% block content %}
+<style>
+    .analytics-dashboard {
+        padding: 2rem;
+        margin-top: 2rem;
+    }
+    
+    .stats-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .stat-card {
+        background-color: #f8f9fa;
+        border: 1px solid #dfe6e9;
+        border-radius: 10px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+        transition: all 0.3s ease;
+    }
+    
+    .stat-card:hover {
+        background-color: #dfe6e9;
+    }
+    
+    .stat-card h3 {
+        font-size: 1rem;
+        color: #666;
+        margin-bottom: 0.5rem;
+    }
+    
+    .stat-card .value {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #6c5ce7;
+    }
+    
+    .stat-card .trend {
+        display: flex;
+        align-items: center;
+        margin-top: 0.5rem;
+        font-size: 0.9rem;
+    }
+    
+    .trend.up {
+        color: #6c5ce7;
+    }
+    
+    .trend.down {
+        color: #a29bfe;
+    }
+    
+    .charts-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 2rem;
+    }
+
+    .chart-container {
+        background-color: #f8f9fa;
+        border-radius: 10px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+        position: relative;
+        min-height: 300px;
+    }
+    
+    @media (max-width: 768px) {
+        .charts-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        margin-top: 2rem;
+        background-color: #f8f9fa;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    }
+
+    .table th, .table td {
+        padding: 12px 15px;
+        text-align: left;
+        border-bottom: 1px solid #dfe6e9;
+    }
+
+    .table th {
+        background-color: #6c5ce7;
+        color: white;
+        font-weight: bold;
+    }
+
+    .table tr:last-child td {
+        border-bottom: none;
+    }
+
+    .table tr:hover {
+        background-color: #f1f3f5;
+    }
+
+    .refresh-button {
+        margin-bottom: 1rem;
+        padding: 0.5rem 1rem;
+        background-color: #6c5ce7;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+
+    .refresh-button:hover {
+        background-color: #5a4bc5;
+    }
+
+    .history-button {
+        padding: 0.3rem 0.8rem;
+        background-color: #6c5ce7;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 0.9rem;
+    }
+
+    .history-button:hover {
+        background-color: #5a4bc5;
+    }
+
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+    }
+
+    .modal-content {
+        background-color: #fff;
+        padding: 2rem;
+        border-radius: 10px;
+        max-width: 800px;
+        width: 90%;
+        max-height: 80vh;
+        overflow-y: auto;
+        position: relative;
+    }
+
+    .modal-content h2 {
+        margin-top: 0;
+        color: #6c5ce7;
+    }
+
+    .close-button {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        font-size: 1.5rem;
+        cursor: pointer;
+        color: #666;
+    }
+
+    .history-charts {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+
+    .history-chart-container {
+        background-color: #f8f9fa;
+        border-radius: 10px;
+        padding: 1rem;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    }
+
+    .chart-error {
+        color: red;
+        text-align: center;
+        padding: 1rem;
+        font-size: 0.9rem;
+    }
+</style>
+
+<div class="container analytics-dashboard">
+    <h1 class="mb-4">Analytics Dashboard</h1>
+    <button class="refresh-button" onclick="fetchInventoryData()">Refresh Charts</button>
+    
+    <!-- Stats Cards -->
+    <div class="stats-cards">
+        <div class="stat-card">
+            <h3>Total Items</h3>
+            <div class="value">{{ total_items }}</div>
+            <div class="trend up">
+                <i class="bi bi-arrow-up-right me-1"></i> 12% from last month
+            </div>
+        </div>
+        
+        <div class="stat-card">
+            <h3>Total Quantity</h3>
+            <div class="value">{{ total_quantity }}</div>
+            <div class="trend up">
+                <i class="bi bi-arrow-up-right me-1"></i> 8% from last month
+            </div>
+        </div>
+        
+        <div class="stat-card">
+            <h3>Total Value</h3>
+            <div class="value">${{ total_value }}</div>
+            <div class="trend up">
+                <i class="bi bi-arrow-up-right me-1"></i> 15% from last month
+            </div>
+        </div>
+        
+        <div class="stat-card">
+            <h3>Low Stock Items</h3>
+            <div class="value">{{ low_stock_count }}</div>
+            <div class="trend down">
+                <i class="bi bi-arrow-down-right me-1"></i> 5% from last month
+            </div>
+        </div>
+    </div>
+    
+    <!-- Charts -->
+    <div class="charts-grid">
+        <div class="chart-container">
+            <canvas id="lineChart1"></canvas>
+        </div>
+        <div class="chart-container">
+            <canvas id="pieChart2"></canvas>
+        </div>
+    </div>
+
+    <!-- Items Table -->
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Item Number</th>
+                <th>Item Name</th>
+                <th>Quantity</th>
+                <th>Price</th>
+                <th>Date Added</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td>{{ item.item_number }}</td>
+                <td>{{ item.item_name }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>{{ item.price }}</td>
+                <td>{{ item.date_added }}</td>
+                <td>
+                    <button class="history-button" onclick="showItemHistory({{ item.id }}, '{{ item.item_name | escapejs }}')">View History</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- History Modal -->
+    <div id="historyModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" onclick="closeModal()">×</span>
+            <h2 id="modalTitle">Item History</h2>
+            <div class="history-charts">
+                <div class="history-chart-container">
+                    <canvas id="quantityHistoryChart"></canvas>
+                </div>
+                <div class="history-chart-container">
+                    <canvas id="priceHistoryChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+// Singleton to manage chart state
+const ChartManager = (function() {
+    let lineChart1 = null;
+    let pieChart2 = null;
+    let quantityHistoryChart = null;
+    let priceHistoryChart = null;
+    let refreshIntervalId = null;
+    let isInitialized = false;
+
+    // Function to destroy existing dashboard charts
+    function destroyDashboardCharts() {
+        if (lineChart1) {
+            lineChart1.destroy();
+            lineChart1 = null;
+            console.log('Dashboard line chart destroyed');
+        }
+        if (pieChart2) {
+            pieChart2.destroy();
+            pieChart2 = null;
+            console.log('Dashboard pie chart destroyed');
+        }
+    }
+
+    // Function to destroy history charts
+    function destroyHistoryCharts() {
+        if (quantityHistoryChart) {
+            quantityHistoryChart.destroy();
+            quantityHistoryChart = null;
+            console.log('Quantity history chart destroyed');
+        }
+        if (priceHistoryChart) {
+            priceHistoryChart.destroy();
+            priceHistoryChart = null;
+            console.log('Price history chart destroyed');
+        }
+    }
+
+    // Function to check if dashboard chart canvases are available
+    function areDashboardChartCanvasesAvailable() {
+        const lineCanvas = document.getElementById('lineChart1');
+        const pieCanvas = document.getElementById('pieChart2');
+        const available = !!lineCanvas && !!pieCanvas;
+        if (!available) {
+            console.warn('Dashboard chart canvases not available:', {
+                lineChart1: !!lineCanvas,
+                pieChart2: !!pieCanvas
+            });
+        }
+        return available;
+    }
+
+    // Function to check if history chart canvases are available
+    function areHistoryChartCanvasesAvailable() {
+        const quantityCanvas = document.getElementById('quantityHistoryChart');
+        const priceCanvas = document.getElementById('priceHistoryChart');
+        const available = !!quantityCanvas && !!priceCanvas;
+        if (!available) {
+            console.warn('History chart canvases not available:', {
+                quantityHistoryChart: !!quantityCanvas,
+                priceHistoryChart: !!priceCanvas
+            });
+        }
+        return available;
+    }
+
+    // Function to wait for canvases to be available
+    async function waitForCanvases(maxAttempts = 10, delay = 500, canvasType = 'dashboard') {
+        let attempts = 0;
+        while (attempts < maxAttempts) {
+            const available = canvasType === 'dashboard' ? areDashboardChartCanvasesAvailable() : areHistoryChartCanvasesAvailable();
+            if (available) {
+                console.log(`${canvasType} chart canvases now available after waiting`);
+                return true;
+            }
+            console.log(`Waiting for ${canvasType} chart canvases... Attempt ${attempts + 1}/${maxAttempts}`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            attempts++;
+        }
+        console.error(`${canvasType} chart canvases not available after maximum attempts`);
+        return false;
+    }
+
+    // Function to display chart-specific errors
+    function displayChartError(containerId, message) {
+        const container = document.getElementById(containerId)?.parentElement;
+        if (!container) {
+            console.error(`Cannot display chart error: Container for ${containerId} not found in DOM`);
+            return;
+        }
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'chart-error';
+        errorDiv.textContent = message;
+        container.innerHTML = '';
+        container.appendChild(errorDiv);
+    }
+
+    // Function to initialize dashboard charts
+    function initializeDashboardCharts() {
+        if (!areDashboardChartCanvasesAvailable()) {
+            console.error('Cannot initialize dashboard charts: Canvases not available');
+            return;
+        }
+
+        // Destroy any existing charts to prevent canvas reuse errors
+        destroyDashboardCharts();
+
+        const ctx1 = document.getElementById('lineChart1').getContext('2d');
+        const ctx2 = document.getElementById('pieChart2').getContext('2d');
+
+        // Initialize Line Curve Chart (for Price)
+        try {
+            lineChart1 = new Chart(ctx1, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Value',
+                        data: [],
+                        borderColor: '#6c5ce7',
+                        backgroundColor: 'rgba(108, 92, 231, 0.2)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 5,
+                        pointHoverRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: { title: { display: true, text: 'Items' } },
+                        y: { title: { display: true, text: 'Value' }, beginAtZero: true }
+                    },
+                    plugins: {
+                        legend: { display: true },
+                        tooltip: { enabled: true }
+                    }
+                }
+            });
+            console.log('Dashboard line chart initialized successfully');
+        } catch (error) {
+            console.error('Error initializing dashboard line chart:', error);
+            displayChartError('lineChart1', 'Failed to load line chart.');
+        }
+
+        // Initialize 2D Pie Chart (for Quantity)
+        try {
+            pieChart2 = new Chart(ctx2, {
+                type: 'pie',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        data: [],
+                        backgroundColor: [
+                            '#6c5ce7',
+                            '#a29bfe',
+                            '#dfe6e9',
+                            '#b2bec3',
+                            '#636e72'
+                        ],
+                        borderColor: '#ffffff',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'top' },
+                        tooltip: { enabled: true }
+                    }
+                }
+            });
+            console.log('Dashboard pie chart initialized successfully');
+        } catch (error) {
+            console.error('Error initializing dashboard pie chart:', error);
+            displayChartError('pieChart2', 'Failed to load pie chart.');
+        }
+    }
+
+    // Function to initialize history charts
+    function initializeHistoryCharts(historyData) {
+        if (!areHistoryChartCanvasesAvailable()) {
+            console.error('Cannot initialize history charts: Canvases not available');
+            return;
+        }
+
+        // Destroy any existing history charts
+        destroyHistoryCharts();
+
+        const quantityCtx = document.getElementById('quantityHistoryChart').getContext('2d');
+        const priceCtx = document.getElementById('priceHistoryChart').getContext('2d');
+
+        // Prepare data for history charts
+        const timestamps = historyData.map(entry => new Date(entry.changed_at).toLocaleString());
+        const quantities = historyData.map(entry => entry.new_quantity ?? entry.old_quantity);
+        const prices = historyData.map(entry => entry.new_price ?? entry.old_price);
+        
+
+        // Initialize Quantity History Chart
+        try {
+            quantityHistoryChart = new Chart(quantityCtx, {
+                type: 'line',
+                data: {
+                    labels: timestamps,
+                    datasets: [{
+                        label: 'Quantity Over Time',
+                        data: quantities,
+                        borderColor: '#6c5ce7',
+                        backgroundColor: 'rgba(108, 92, 231, 0.2)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 5,
+                        pointHoverRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: { title: { display: true, text: 'Time' } },
+                        y: { title: { display: true, text: 'Quantity' }, beginAtZero: true }
+                    },
+                    plugins: {
+                        legend: { display: true },
+                        tooltip: { enabled: true }
+                    }
+                }
+            });
+            console.log('Quantity history chart initialized successfully');
+        } catch (error) {
+            console.error('Error initializing quantity history chart:', error);
+            displayChartError('quantityHistoryChart', 'Failed to load quantity history chart.');
+        }
+
+        // Initialize Price History Chart
+        try {
+            priceHistoryChart = new Chart(priceCtx, {
+                type: 'line',
+                data: {
+                    labels: timestamps,
+                    datasets: [{
+                        label: 'Price Over Time',
+                        data: prices,
+                        borderColor: '#a29bfe',
+                        backgroundColor: 'rgba(162, 155, 254, 0.2)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 5,
+                        pointHoverRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: { title: { display: true, text: 'Time' } },
+                        y: { title: { display: true, text: 'Price' }, beginAtZero: true }
+                    },
+                    plugins: {
+                        legend: { display: true },
+                        tooltip: { enabled: true }
+                    }
+                }
+            });
+            console.log('Price history chart initialized successfully');
+        } catch (error) {
+            console.error('Error initializing price history chart:', error);
+            displayChartError('priceHistoryChart', 'Failed to load price history chart.');
+        }
+    }
+
+    // Function to validate item data
+    function validateItem(item) {
+        return item && typeof item === 'object' &&
+               typeof item.item_name === 'string' &&
+               typeof item.quantity === 'number' &&
+               typeof item.price === 'number';
+    }
+
+    // Function to fetch inventory data from Flask API
+    async function fetchInventoryData() {
+        console.log('Fetching inventory data...');
+
+        // Check if dashboard chart canvases are still available
+        if (!areDashboardChartCanvasesAvailable()) {
+            console.warn('Stopping fetch: Dashboard chart canvases not available. Clearing refresh interval.');
+            if (refreshIntervalId) {
+                clearInterval(refreshIntervalId);
+                refreshIntervalId = null;
+            }
+            return;
+        }
+
+        try {
+            const response = await fetch('http://127.0.0.1:5000/api/inventory/', {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Bearer {{ request.session.access_token | safe }}',
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            console.log('Fetch response status:', response.status);
+            if (!response.ok) {
+                if (response.status === 401) {
+                    console.warn('Unauthorized - redirecting to login');
+                    window.location.href = '{% url "login" %}';
+                    return;
+                }
+                throw new Error(`Failed to fetch inventory data: ${response.status} ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            console.log('Fetched data:', data);
+
+            if (!data || !Array.isArray(data.items)) {
+                throw new Error('Invalid data format: items array missing');
+            }
+
+            const items = data.items;
+            if (items.length === 0) {
+                console.warn('No items found in response');
+                return;
+            }
+
+            // Validate items
+            const validItems = items.filter(validateItem);
+            if (validItems.length !== items.length) {
+                console.warn('Some items are invalid:', items.filter(item => !validateItem(item)));
+            }
+
+            // Prepare data for charts
+            const itemNames = validItems.map(item => item.item_name);
+            const itemQuantities = validItems.map(item => item.quantity);
+            const itemValues = validItems.map(item => item.quantity * item.price);
+
+            console.log('Chart data - Names:', itemNames);
+            console.log('Chart data - Quantities:', itemQuantities);
+            console.log('Chart data - Values:', itemValues);
+
+            // Update Line Curve Chart (for Price)
+            if (lineChart1) {
+                try {
+                    lineChart1.data.labels = itemNames;
+                    lineChart1.data.datasets[0].data = itemValues;
+                    lineChart1.update();
+                    console.log('Dashboard line chart updated successfully');
+                } catch (error) {
+                    console.error('Error updating dashboard line chart:', error);
+                    displayChartError('lineChart1', 'Failed to update line chart.');
+                }
+            } else {
+                console.warn('Dashboard line chart not initialized, reinitializing charts');
+                if (areDashboardChartCanvasesAvailable()) {
+                    initializeDashboardCharts();
+                    if (lineChart1) {
+                        lineChart1.data.labels = itemNames;
+                        lineChart1.data.datasets[0].data = itemValues;
+                        lineChart1.update();
+                    }
+                }
+            }
+
+            // Update 2D Pie Chart (for Quantity)
+            if (pieChart2) {
+                try {
+                    pieChart2.data.labels = itemNames;
+                    pieChart2.data.datasets[0].data = itemQuantities;
+                    pieChart2.update();
+                    console.log('Dashboard pie chart updated successfully');
+                } catch (error) {
+                    console.error('Error updating dashboard pie chart:', error);
+                    displayChartError('pieChart2', 'Failed to update pie chart.');
+                }
+            } else {
+                console.warn('Dashboard pie chart not initialized, reinitializing charts');
+                if (areDashboardChartCanvasesAvailable()) {
+                    initializeDashboardCharts();
+                    if (pieChart2) {
+                        pieChart2.data.labels = itemNames;
+                        pieChart2.data.datasets[0].data = itemQuantities;
+                        pieChart2.update();
+                    }
+                }
+            }
+
+        } catch (error) {
+            console.error('Error fetching inventory data:', error);
+            const errorDiv = document.createElement('div');
+            errorDiv.style.color = 'red';
+            errorDiv.textContent = `Failed to load chart data: ${error.message}`;
+            const dashboard = document.querySelector('.analytics-dashboard');
+            if (dashboard) {
+                dashboard.prepend(errorDiv);
+            } else {
+                console.error('Cannot display fetch error: .analytics-dashboard not found in DOM');
+            }
+        }
+    }
+
+    // Function to fetch and display item history as charts
+    async function showItemHistory(itemId, itemName) {
+        console.log(`Fetching history for item ID: ${itemId}`);
+        try {
+            const response = await fetch(`http://127.0.0.1:5000/api/inventory/${itemId}/history`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Bearer {{ request.session.access_token | safe }}',
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            console.log('History fetch response status:', response.status);
+            if (!response.ok) {
+                if (response.status === 401) {
+                    console.warn('Unauthorized - redirecting to login');
+                    window.location.href = '{% url "login" %}';
+                    return;
+                }
+                throw new Error(`Failed to fetch item history: ${response.status} ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            console.log('History data:', data);
+            const history = data.history || [];
+
+            // Update modal title
+            const modalTitle = document.getElementById('modalTitle');
+            if (!modalTitle) {
+                console.error('Modal title element not found in DOM');
+                return;
+            }
+            modalTitle.textContent = `History for ${itemName}`;
+
+            // Wait for history chart canvases to be available
+            const canvasesAvailable = await waitForCanvases(10, 500, 'history');
+            if (!canvasesAvailable) {
+                console.error('Failed to show history charts: Canvases not available');
+                return;
+            }
+
+            // If no history data, display a message
+            if (history.length === 0) {
+                const historyChartsDiv = document.querySelector('.history-charts');
+                if (historyChartsDiv) {
+                    historyChartsDiv.innerHTML = '<p>No history available</p>';
+                }
+            } else {
+                // Initialize history charts with the data
+                initializeHistoryCharts(history);
+            }
+
+            // Show modal
+            const modal = document.getElementById('historyModal');
+            if (modal) {
+                modal.style.display = 'flex';
+            } else {
+                console.error('History modal not found in DOM');
+            }
+
+        } catch (error) {
+            console.error('Error fetching item history:', error);
+            const errorDiv = document.createElement('div');
+            errorDiv.style.color = 'red';
+            errorDiv.textContent = `Failed to load item history: ${error.message}`;
+            const dashboard = document.querySelector('.analytics-dashboard');
+            if (dashboard) {
+                dashboard.prepend(errorDiv);
+            } else {
+                console.error('Cannot display history error: .analytics-dashboard not found in DOM');
+            }
+        }
+    }
+
+    // Function to close modal
+    function closeModal() {
+        const modal = document.getElementById('historyModal');
+        if (modal) {
+            modal.style.display = 'none';
+            // Destroy history charts to prevent canvas reuse errors
+            destroyHistoryCharts();
+            // Reset the history charts container
+            const historyChartsDiv = document.querySelector('.history-charts');
+            if (historyChartsDiv) {
+                historyChartsDiv.innerHTML = `
+                    <div class="history-chart-container">
+                        <canvas id="quantityHistoryChart"></canvas>
+                    </div>
+                    <div class="history-chart-container">
+                        <canvas id="priceHistoryChart"></canvas>
+                    </div>
+                `;
+            }
+        } else {
+            console.error('History modal not found in DOM');
+        }
+    }
+
+    // Main initialization
+    async function init() {
+        if (isInitialized) {
+            console.log('ChartManager already initialized, skipping');
+            return;
+        }
+        isInitialized = true;
+        console.log('Initializing ChartManager');
+
+        // Wait for dashboard canvases to be available
+        const canvasesAvailable = await waitForCanvases(10, 500, 'dashboard');
+        if (!canvasesAvailable) {
+            console.error('Failed to initialize dashboard charts: Canvases not available after waiting');
+            return;
+        }
+
+        // Initialize dashboard charts
+        initializeDashboardCharts();
+
+        // Initial data fetch
+        fetchInventoryData();
+
+        // Refresh data every 30 seconds
+        refreshIntervalId = setInterval(() => {
+            console.log('Scheduled data refresh...');
+            fetchInventoryData();
+        }, 30000);
+
+        // Close modal when clicking outside
+        const modal = document.getElementById('historyModal');
+        if (modal) {
+            modal.addEventListener('click', function(event) {
+                if (event.target === this) {
+                    closeModal();
+                }
+            });
+        } else {
+            console.error('History modal not found in DOM for event listener');
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', function() {
+            if (refreshIntervalId) {
+                clearInterval(refreshIntervalId);
+                console.log('Cleared refresh interval on page unload');
+            }
+            destroyDashboardCharts();
+            destroyHistoryCharts();
+        });
+    }
+
+    return {
+        init,
+        fetchInventoryData,
+        showItemHistory,
+        closeModal
+    };
+})();
+
+// Initialize on DOMContentLoaded
+document.addEventListener('DOMContentLoaded', function() {
+    ChartManager.init();
+});
+
+// Expose functions to global scope
+window.fetchInventoryData = ChartManager.fetchInventoryData;
+window.showItemHistory = ChartManager.showItemHistory;
+window.closeModal = ChartManager.closeModal;
+</script>
+{% endblock %}
+{% endblock %}
